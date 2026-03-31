@@ -28,7 +28,9 @@ services:
       - overseer
 
   backend-application:
-    image: bitflicker64/rate-limiting-api:latest
+    build:
+      context: ./
+      dockerfile: Dockerfile
     container_name: backend-application
     ports:
       - "8080:8080"

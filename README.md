@@ -64,8 +64,15 @@ If limit is hit:
 ---
 
 ## Running locally
+
+**Option 1 — Pull from Docker Hub (recommended)**
 ```bash
 docker-compose up -d
+```
+
+**Option 2 — Build locally**
+```bash
+docker-compose -f docker-compose.dev.yml up -d
 ```
 
 Swagger UI: `http://localhost:8080/swagger-ui.html`
