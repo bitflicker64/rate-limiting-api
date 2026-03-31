@@ -1,7 +1,6 @@
 # Rate Limiting API — Spring Boot
 
 A backend system built to explore how real-world APIs handle authentication and abuse prevention.
-
 Implements JWT-based auth and per-user rate limiting using the Token Bucket algorithm, backed by Redis.
 
 ---
@@ -15,7 +14,7 @@ work together in a single request lifecycle — and how Redis fits into that bey
 
 ## Tech Stack
 
-- Java 17 + Spring Boot 3
+- Java 21 + Spring Boot 3
 - Spring Security 6
 - MySQL + JPA (Flyway migrations)
 - Redis + Bucket4j (rate limiting)
@@ -56,10 +55,20 @@ If limit is hit:
 
 ## Rate Limit Headers
 
-| Header                          | What it tells you                        |
-|---------------------------------|------------------------------------------|
-| X-Rate-Limit-Remaining          | Tokens left in current window            |
-| X-Rate-Limit-Retry-After-Seconds| Seconds until limit resets               |
+| Header                            | What it tells you                 |
+|-----------------------------------|-----------------------------------|
+| X-Rate-Limit-Remaining            | Tokens left in current window     |
+| X-Rate-Limit-Retry-After-Seconds  | Seconds until limit resets        |
+
+---
+
+## What I added
+
+- **Redis caching layer** (`CachedLookupService`) on top of the existing rate limiter
+    - User auth details cached by email — avoids DB hit on every login
+    - Active plan limit cached by userId — avoids DB hit on every API request
+    - Cache eviction wired to plan updates so stale data is never served
+    - 10 minute TTL configured via Spring Cache abstraction
 
 ---
 
@@ -85,3 +94,4 @@ Swagger UI: `http://localhost:8080/swagger-ui.html`
 - Where JWT validation fits vs where rate limiting fits
 - Why Redis makes rate limiting stateless and scalable
 - How Token Bucket algorithm handles bursts vs sustained traffic
+- How to layer Redis caching cleanly without touching existing logic
