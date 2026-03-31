@@ -1,5 +1,7 @@
 package com.behl.overseer.dto;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
@@ -15,7 +17,10 @@ import lombok.extern.jackson.Jacksonized;
 @Jacksonized
 @JsonNaming(value = PropertyNamingStrategies.UpperCamelCaseStrategy.class)
 @Schema(title = "Plan", accessMode = Schema.AccessMode.READ_ONLY)
-public class PlanResponseDto {
+public class PlanResponseDto implements Serializable {
+
+	@Serial
+	private static final long serialVersionUID = 1L;
 
 	private UUID id;
 	private String name;
