@@ -88,6 +88,31 @@ Swagger UI: `http://localhost:8080/swagger-ui.html`
 
 ---
 
+## Live Demo
+
+Swagger UI: https://rate-limiting-api-production.up.railway.app/swagger-ui/index.html
+
+### Test credentials
+To test the API:
+
+1. GET `/api/v1/plan` — copy any Plan ID
+2. POST `/api/v1/user` — create account:
+```json
+{
+  "EmailId": "test@gmail.com",
+  "Password": "Test@1234",
+  "PlanId": "<plan-id-from-above>"
+}
+```
+3. POST `/api/v1/auth/login` — get token:
+```json
+{
+  "EmailId": "test@gmail.com",
+  "Password": "Test@1234"
+}
+```
+4. Click **Authorize** in Swagger → paste token as `Bearer <token>`
+
 ## What I learned
 
 - How Spring Security filter chain actually works
