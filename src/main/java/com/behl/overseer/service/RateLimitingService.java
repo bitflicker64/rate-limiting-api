@@ -5,8 +5,6 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.behl.overseer.repository.UserPlanMappingRepository;
-
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -18,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 public class RateLimitingService {
 
 	private final ProxyManager<UUID> proxyManager;
-	private final UserPlanMappingRepository userPlanMappingRepository;
+	private final CachedLookupService cachedLookupService;
 
 	/**
 	 * Retrieves the stored rate-limiting bucket for the specified user. If no
@@ -52,8 +50,7 @@ public class RateLimitingService {
 	 * @throws IllegalArgumentException if provided argument is <code>null</code>.
 	 */
 	private BucketConfiguration createBucketConfiguration(@NonNull final UUID userId) {
-		final var userPlanMapping = userPlanMappingRepository.getActivePlan(userId);
-		final var limitPerHour = userPlanMapping.getPlan().getLimitPerHour();
+		final var limitPerHour = cachedLookupService.getActivePlanLimitPerHour(userId);
 		return BucketConfiguration.builder()
 				.addLimit(limit -> limit.capacity(limitPerHour).refillIntervally(limitPerHour, Duration.ofHours(1)))
 				.build();

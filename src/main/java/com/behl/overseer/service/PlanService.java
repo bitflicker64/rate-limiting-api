@@ -21,6 +21,7 @@ public class PlanService {
 
 	private final PlanRepository planRepository;
 	private final RateLimitingService rateLimitingService;
+	private final CachedLookupService cachedLookupService;
 	private final UserPlanMappingRepository userPlanMappingRepository;
 	private final AuthenticatedUserIdProvider authenticatedUserIdProvider;
 
@@ -56,6 +57,7 @@ public class PlanService {
 		newPlan.setPlanId(planId);
 		userPlanMappingRepository.save(newPlan);
 
+		cachedLookupService.evictActivePlanLimitPerHour(userId);
 		rateLimitingService.reset(userId);
 	}
 
@@ -65,14 +67,7 @@ public class PlanService {
 	 * @return List of PlanResponseDto containing details of each available plan.
 	 */
 	public List<PlanResponseDto> retrieve() {
-		return planRepository.findAll()
-				.stream()
-				.map(plan -> PlanResponseDto.builder()
-						.id(plan.getId())
-						.name(plan.getName())
-						.limitPerHour(plan.getLimitPerHour())
-						.build())
-				.toList();
+		return cachedLookupService.retrievePlans();
 	}
 
 }

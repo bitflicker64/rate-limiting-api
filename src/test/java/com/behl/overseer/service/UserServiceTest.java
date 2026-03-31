@@ -8,7 +8,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -32,9 +31,10 @@ class UserServiceTest {
 	private final UserRepository userRepository = mock(UserRepository.class);
 	private final PlanRepository planRepository = mock(PlanRepository.class);
 	private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+	private final CachedLookupService cachedLookupService = mock(CachedLookupService.class);
 	private final UserPlanMappingRepository userPlanMappingRepository = mock(UserPlanMappingRepository.class);
 	private final UserService userService = new UserService(jwtUtility, userRepository, planRepository, passwordEncoder,
-			userPlanMappingRepository);
+			cachedLookupService, userPlanMappingRepository);
 
 	@Test
 	void userCreationShouldThrowExceptionForDuplicateEmailId() {
@@ -101,7 +101,10 @@ class UserServiceTest {
 		when(passwordEncoder.encode(password)).thenReturn(encodedPassword);
 
 		// set datasource to save user successfully
-		when(userRepository.save(any(User.class))).thenReturn(mock(User.class));
+		final var userId = UUID.randomUUID();
+		final var savedUser = mock(User.class);
+		when(savedUser.getId()).thenReturn(userId);
+		when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
 		// invoke method under test
 		userService.create(userCreationRequest);
@@ -117,6 +120,7 @@ class UserServiceTest {
 
 		verify(userRepository, times(1)).save(any(User.class));
 		verify(userPlanMappingRepository, times(1)).save(any(UserPlanMapping.class));
+		verify(cachedLookupService, times(1)).evictUserAuthenticationByEmailId(emailId);
 	}
 
 	@Test
@@ -126,15 +130,15 @@ class UserServiceTest {
 		final var userLoginRequest = mock(UserLoginRequestDto.class);
 		when(userLoginRequest.getEmailId()).thenReturn(emailId);
 
-		// set datasource to return no response for unregistered email-id
-		when(userRepository.findByEmailId(emailId)).thenReturn(Optional.empty());
+		// set cache lookup to return no response for unregistered email-id
+		when(cachedLookupService.getUserAuthenticationByEmailId(emailId)).thenThrow(InvalidLoginCredentialsException.class);
 
 		// assert InvalidLoginCredentialsException is thrown for unregistered email-id
 		assertThrows(InvalidLoginCredentialsException.class, () -> userService.login(userLoginRequest));
 
 		// verify mock interactions
 		verify(userLoginRequest, times(1)).getEmailId();
-		verify(userRepository, times(1)).findByEmailId(emailId);
+		verify(cachedLookupService, times(1)).getUserAuthenticationByEmailId(emailId);
 	}
 
 	@Test
@@ -146,11 +150,11 @@ class UserServiceTest {
 		when(userLoginRequest.getEmailId()).thenReturn(emailId);
 		when(userLoginRequest.getPassword()).thenReturn(password);
 
-		// prepare datasource to return saved user
+		// prepare cache lookup response for saved user
 		final var encodedPassword = "test-encoded-password";
-		final var user = mock(User.class);
-		when(user.getPassword()).thenReturn(encodedPassword);
-		when(userRepository.findByEmailId(emailId)).thenReturn(Optional.of(user));
+		final var userId = UUID.randomUUID();
+		when(cachedLookupService.getUserAuthenticationByEmailId(emailId))
+				.thenReturn(new CachedLookupService.CachedUserAuthentication(userId, encodedPassword));
 
 		// set password validation to fail
 		when(passwordEncoder.matches(password, encodedPassword)).thenReturn(Boolean.FALSE);
@@ -161,9 +165,8 @@ class UserServiceTest {
 		// verify mock interactions
 		verify(userLoginRequest, times(1)).getEmailId();
 		verify(userLoginRequest, times(1)).getPassword();
-		verify(user, times(1)).getPassword();
 
-		verify(userRepository, times(1)).findByEmailId(emailId);
+		verify(cachedLookupService, times(1)).getUserAuthenticationByEmailId(emailId);
 		verify(passwordEncoder, times(1)).matches(password, encodedPassword);
 	}
 
@@ -176,13 +179,11 @@ class UserServiceTest {
 		when(userLoginRequest.getEmailId()).thenReturn(emailId);
 		when(userLoginRequest.getPassword()).thenReturn(password);
 
-		// prepare datasource to return saved user
+		// prepare cache lookup response for saved user
 		final var encodedPassword = "test-encoded-password";
 		final var userId = UUID.randomUUID();
-		final var user = mock(User.class);
-		when(user.getPassword()).thenReturn(encodedPassword);
-		when(user.getId()).thenReturn(userId);
-		when(userRepository.findByEmailId(emailId)).thenReturn(Optional.of(user));
+		when(cachedLookupService.getUserAuthenticationByEmailId(emailId))
+				.thenReturn(new CachedLookupService.CachedUserAuthentication(userId, encodedPassword));
 
 		// set password validation to pass
 		when(passwordEncoder.matches(password, encodedPassword)).thenReturn(Boolean.TRUE);
@@ -200,9 +201,8 @@ class UserServiceTest {
 		// verify mock interactions
 		verify(userLoginRequest, times(1)).getEmailId();
 		verify(userLoginRequest, times(1)).getPassword();
-		verify(user, times(1)).getPassword();
 
-		verify(userRepository, times(1)).findByEmailId(emailId);
+		verify(cachedLookupService, times(1)).getUserAuthenticationByEmailId(emailId);
 		verify(passwordEncoder, times(1)).matches(password, encodedPassword);
 		verify(jwtUtility, times(1)).generateAccessToken(userId);
 	}

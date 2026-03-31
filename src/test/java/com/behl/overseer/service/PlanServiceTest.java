@@ -13,23 +13,23 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.behl.overseer.dto.PlanResponseDto;
 import com.behl.overseer.dto.PlanUpdationRequestDto;
-import com.behl.overseer.entity.Plan;
 import com.behl.overseer.entity.UserPlanMapping;
 import com.behl.overseer.exception.InvalidPlanException;
 import com.behl.overseer.repository.PlanRepository;
 import com.behl.overseer.repository.UserPlanMappingRepository;
 import com.behl.overseer.utility.AuthenticatedUserIdProvider;
 
-import net.bytebuddy.utility.RandomString;
-
 class PlanServiceTest {
 
 	private final PlanRepository planRepository = mock(PlanRepository.class);
 	private final RateLimitingService rateLimitingService = mock(RateLimitingService.class);
+	private final CachedLookupService cachedLookupService = mock(CachedLookupService.class);
 	private final UserPlanMappingRepository userPlanMappingRepository = mock(UserPlanMappingRepository.class);
 	private final AuthenticatedUserIdProvider authenticatedUserIdProvider = mock(AuthenticatedUserIdProvider.class);
-	private final PlanService planService = new PlanService(planRepository, rateLimitingService, userPlanMappingRepository, authenticatedUserIdProvider);
+	private final PlanService planService = new PlanService(planRepository, rateLimitingService, cachedLookupService,
+			userPlanMappingRepository, authenticatedUserIdProvider);
 
 	@Test
 	void planUpdationshouldThrowExceptionForInvalidPlanId() {
@@ -78,6 +78,7 @@ class PlanServiceTest {
 		verify(userPlanMappingRepository, times(1)).isActivePlan(userId, planId);
 		verify(userPlanMappingRepository, times(0)).deactivateCurrentPlan(userId);
 		verify(userPlanMappingRepository, times(0)).save(any(UserPlanMapping.class));
+		verify(cachedLookupService, times(0)).evictActivePlanLimitPerHour(userId);
 	}
 
 	@Test
@@ -107,22 +108,18 @@ class PlanServiceTest {
 		verify(userPlanMappingRepository, times(1)).isActivePlan(userId, planId);
 		verify(userPlanMappingRepository, times(1)).deactivateCurrentPlan(userId);
 		verify(userPlanMappingRepository, times(1)).save(any(UserPlanMapping.class));
+		verify(cachedLookupService, times(1)).evictActivePlanLimitPerHour(userId);
 		verify(rateLimitingService, times(1)).reset(userId);
 	}
 
 	@Test
 	void shouldRetrievePlansFromDatasource() {
-		// prepare plan record
+		// prepare cached plans response
 		final var planId = UUID.randomUUID();
-		final var planName = RandomString.make();
+		final var planName = "test-plan";
 		final var limitPerHour = 20;
-		final var plan = mock(Plan.class);
-		when(plan.getId()).thenReturn(planId);
-		when(plan.getName()).thenReturn(planName);
-		when(plan.getLimitPerHour()).thenReturn(limitPerHour);
-
-		// configure datasource to return created plan
-		when(planRepository.findAll()).thenReturn(List.of(plan));
+		final var expectedPlanResponse = PlanResponseDto.builder().id(planId).name(planName).limitPerHour(limitPerHour).build();
+		when(cachedLookupService.retrievePlans()).thenReturn(List.of(expectedPlanResponse));
 
 		// invoke method under test
 		final var response = planService.retrieve();
@@ -136,7 +133,7 @@ class PlanServiceTest {
 		});
 
 		// verify mock interaction
-		verify(planRepository, times(1)).findAll();
+		verify(cachedLookupService, times(1)).retrievePlans();
 	}
 
 }

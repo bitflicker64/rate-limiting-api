@@ -13,6 +13,13 @@ spring:
       host: ${REDIS_HOSTNAME:127.0.0.1}
       port: ${REDIS_PORT:6380}
       password: ${REDIS_PASSWORD:Password@123}
+  cache:
+    type: redis
+    redis:
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: 'app-cache::'
+      time-to-live: 10m
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -21,7 +28,7 @@ com:
   behl:
     overseer:
       token:
-        secret-key: ${JWT_SECRET_KEY:your-secret-key-here}
+        secret-key: ${JWT_SECRET_KEY:c29tZS1sb2NhbC1kZXYtc2VjcmV0LWtleQ==}
         validity: 120
       open-api:
         enabled: true

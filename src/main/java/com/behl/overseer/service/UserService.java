@@ -28,6 +28,7 @@ public class UserService {
 	private final UserRepository userRepository;
 	private final PlanRepository planRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final CachedLookupService cachedLookupService;
 	private final UserPlanMappingRepository userPlanMappingRepository;
 
 	/**
@@ -63,6 +64,8 @@ public class UserService {
 		userPlanMapping.setUserId(savedUser.getId());
 		userPlanMapping.setPlanId(planId);
 		userPlanMappingRepository.save(userPlanMapping);
+
+		cachedLookupService.evictUserAuthenticationByEmailId(emailId);
 	}
 
 	/**
@@ -75,17 +78,17 @@ public class UserService {
 	 * @throws InvalidLoginCredentialsException If the provided login credentials are invalid.
 	 */
 	public TokenSuccessResponseDto login(@NonNull final UserLoginRequestDto userLoginRequest) {
-		final var user = userRepository.findByEmailId(userLoginRequest.getEmailId())
-				.orElseThrow(InvalidLoginCredentialsException::new);
+		final var userAuthentication = cachedLookupService
+				.getUserAuthenticationByEmailId(userLoginRequest.getEmailId());
 
-		final var encodedPassword = user.getPassword();
+		final var encodedPassword = userAuthentication.encodedPassword();
 		final var plainTextPassword = userLoginRequest.getPassword();
 		final var isCorrectPassword = passwordEncoder.matches(plainTextPassword, encodedPassword);
 		if (Boolean.FALSE.equals(isCorrectPassword)) {
 			throw new InvalidLoginCredentialsException();
 		}
 
-		final var accessToken = jwtUtility.generateAccessToken(user.getId());
+		final var accessToken = jwtUtility.generateAccessToken(userAuthentication.userId());
 		return TokenSuccessResponseDto.builder().accessToken(accessToken).build();
 	}
 
